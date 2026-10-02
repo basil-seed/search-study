@@ -5,18 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Search</title>
 <style>
-  body { margin: 0; padding: 12px; font-family: Arial, sans-serif; background: #fff; }
-  /* hide Google branding clutter a bit; results stay intact */
+  html, body { margin: 0; height: 100%; font-family: Arial, sans-serif; background: #fff; }
+  #searchPane { padding: 12px; height: 100%; box-sizing: border-box; overflow-y: auto; }
   .gsc-control-cse { padding: 0 !important; border: none !important; }
+
+  /* page viewer: shown when a result is clicked */
+  #viewerPane { display: none; height: 100%; flex-direction: column; }
+  #viewerBar { padding: 8px 12px; border-bottom: 1px solid #ddd; background: #f6f6f6; }
+  #backBtn { font-size: 15px; padding: 6px 14px; cursor: pointer; }
+  #viewer { flex: 1; width: 100%; border: none; }
+  .note { font-size: 12px; color: #666; margin-left: 10px; }
 </style>
 
 <script>
   // ===== SETTINGS =====
-  // 1. Paste your Programmable Search Engine ID (the "cx" value) below.
   const CX = "61094ca08f3294d1d";
 
-  // 2. Optional logging. Leave empty ("") for no logging.
-  //    To log, paste a Google Apps Script web-app URL here (see instructions).
+  // Optional logging. Leave empty ("") for no logging.
   const LOG_URL = "";
 
   // Participant ID comes from the iframe URL: search.html?pid=XXXX&trial=3
@@ -27,14 +32,12 @@
   function log(event, detail) {
     const row = { pid: PID, trial: TRIAL, event: event, detail: detail || "",
                   time: new Date().toISOString() };
-    // also tell the parent page (useful if you later move to Gorilla's code editor)
     try { window.parent.postMessage({ action: "search-log", payload: row }, "*"); } catch (e) {}
     if (LOG_URL) {
       fetch(LOG_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(row) });
     }
   }
 
-  // Hooks into the search engine: fires on each query and when results show
   window.__gcse = {
     searchCallbacks: {
       web: {
@@ -44,11 +47,27 @@
     }
   };
 
-  // Log which result a participant clicks
+  function showViewer() {
+    document.getElementById("searchPane").style.display = "none";
+    document.getElementById("viewerPane").style.display = "flex";
+  }
+  function showResults() {
+    document.getElementById("viewerPane").style.display = "none";
+    document.getElementById("searchPane").style.display = "block";
+    document.getElementById("viewer").src = "about:blank";
+    log("back_to_results", "");
+  }
+
+  // Any click on a result link opens it in the viewer, not a new tab
   document.addEventListener("click", function (e) {
-    const a = e.target.closest("a.gs-title");
-    if (a) log("result_click", a.href);
-  });
+    const a = e.target.closest(".gsc-results a[href]");
+    if (!a || !a.href.startsWith("http")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    log("result_click", a.href);
+    document.getElementById("viewer").src = a.href;
+    showViewer();
+  }, true);
 
   log("page_loaded", "");
 </script>
@@ -58,6 +77,16 @@
 </script>
 </head>
 <body>
-  <div class="gcse-search"></div>
+  <div id="searchPane">
+    <div class="gcse-search" data-linkTarget="viewer"></div>
+  </div>
+
+  <div id="viewerPane">
+    <div id="viewerBar">
+      <button id="backBtn" onclick="showResults()">&larr; Back to results</button>
+      <span class="note">If this page stays blank, the site can't be shown here. Go back and choose another result.</span>
+    </div>
+    <iframe id="viewer" name="viewer"></iframe>
+  </div>
 </body>
 </html>
