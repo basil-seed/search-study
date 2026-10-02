@@ -58,16 +58,47 @@
     log("back_to_results", "");
   }
 
-  // Any click on a result link opens it in the viewer, not a new tab
-  document.addEventListener("click", function (e) {
-    const a = e.target.closest(".gsc-results a[href]");
+  // Work out the real destination (Google sometimes swaps in a redirect link)
+  function realUrl(a) {
+    let url = a.getAttribute("data-ctorig") || a.href;
+    try {
+      const u = new URL(url);
+      if (u.hostname.endsWith("google.com") && u.pathname === "/url") {
+        url = u.searchParams.get("q") || u.searchParams.get("url") || url;
+      }
+    } catch (e) {}
+    return url;
+  }
+
+  function openInViewer(url) {
+    if (!url || !String(url).startsWith("http")) return;
+    log("result_click", url);
+    document.getElementById("viewer").src = url;
+    showViewer();
+  }
+
+  // 1. Block any attempt by the search widget to open a new window
+  window.open = function (url) { openInViewer(url); return null; };
+
+  // 2. Catch clicks (and middle-clicks) on result links before Google does
+  function handleLinkClick(e) {
+    const a = e.target.closest("#searchPane a[href]");
     if (!a || !a.href.startsWith("http")) return;
     e.preventDefault();
-    e.stopPropagation();
-    log("result_click", a.href);
-    document.getElementById("viewer").src = a.href;
-    showViewer();
-  }, true);
+    e.stopImmediatePropagation();
+    openInViewer(realUrl(a));
+  }
+  document.addEventListener("click", handleLinkClick, true);
+  document.addEventListener("auxclick", handleLinkClick, true);
+
+  // 3. Keep every result link pointed at the viewer, even as results re-render
+  new MutationObserver(function () {
+    document.querySelectorAll("#searchPane a[href]").forEach(function (a) {
+      if (a.target !== "viewer") a.target = "viewer";
+      a.removeAttribute("onmousedown");
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true,
+                                         attributes: true, attributeFilter: ["target", "href"] });
 
   log("page_loaded", "");
 </script>
