@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search</title>
+<style>
+  body { margin: 0; padding: 12px; font-family: Arial, sans-serif; background: #fff; }
+  /* hide Google branding clutter a bit; results stay intact */
+  .gsc-control-cse { padding: 0 !important; border: none !important; }
+</style>
+
+<script>
+  // ===== SETTINGS =====
+  // 1. Paste your Programmable Search Engine ID (the "cx" value) below.
+  const CX = "61094ca08f3294d1d";
+
+  // 2. Optional logging. Leave empty ("") for no logging.
+  //    To log, paste a Google Apps Script web-app URL here (see instructions).
+  const LOG_URL = "";
+
+  // Participant ID comes from the iframe URL: search.html?pid=XXXX&trial=3
+  const params = new URLSearchParams(location.search);
+  const PID = params.get("pid") || "unknown";
+  const TRIAL = params.get("trial") || "";
+
+  function log(event, detail) {
+    const row = { pid: PID, trial: TRIAL, event: event, detail: detail || "",
+                  time: new Date().toISOString() };
+    // also tell the parent page (useful if you later move to Gorilla's code editor)
+    try { window.parent.postMessage({ action: "search-log", payload: row }, "*"); } catch (e) {}
+    if (LOG_URL) {
+      fetch(LOG_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(row) });
+    }
+  }
+
+  // Hooks into the search engine: fires on each query and when results show
+  window.__gcse = {
+    searchCallbacks: {
+      web: {
+        starting: function (gname, query) { log("query", query); },
+        rendered: function () { log("results_shown", ""); }
+      }
+    }
+  };
+
+  // Log which result a participant clicks
+  document.addEventListener("click", function (e) {
+    const a = e.target.closest("a.gs-title");
+    if (a) log("result_click", a.href);
+  });
+
+  log("page_loaded", "");
+</script>
+<script async id="cse-loader"></script>
+<script>
+  document.getElementById("cse-loader").src = "https://cse.google.com/cse.js?cx=" + CX;
+</script>
+</head>
+<body>
+  <div class="gcse-search"></div>
+</body>
+</html>
